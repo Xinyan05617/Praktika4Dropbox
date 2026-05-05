@@ -8,7 +8,7 @@ import helper
 app_key = ''
 app_secret = ''
 server_addr = "localhost"
-server_port = 8070
+server_port = 8090
 redirect_uri = "http://" + server_addr + ":" + str(server_port)
 
 class Dropbox:
@@ -58,6 +58,43 @@ class Dropbox:
         # Y PROCESAMIENTO DE LAS RESPUESTAS HTTP
         # PARA LA OBTENCION DEL ACCESS TOKEN
         #############################################
+
+        # 1. PASO: Autorización URL construitu eta nabigatzailea ireki
+        auth_url = "https://www.dropbox.com/oauth2/authorize"
+        params = {
+            "client_id": app_key,
+            "response_type": "code",
+            "redirect_uri": redirect_uri
+        }
+        full_url = auth_url + "?" + urllib.parse.urlencode(params)
+        print("Opening browser for Dropbox authorization...")
+        webbrowser.open(full_url)
+
+        # 2. PASO: auth_code lortu tokiko zerbitzaritik
+        auth_code = self.local_server()
+        print("auth_code received: " + auth_code)
+
+        # 3. PASO: auth_code trukatu access_token-engatik
+        token_url = "https://api.dropboxapi.com/oauth2/token"
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+        data = {
+            "code": auth_code,
+            "grant_type": "authorization_code",
+            "client_id": app_key,
+            "client_secret": app_secret,
+            "redirect_uri": redirect_uri
+        }
+        erantzuna = requests.post(token_url, headers=headers, data=data, allow_redirects=False)
+        status = erantzuna.status_code
+        token_json = erantzuna.json()
+        print("Statusa", status)
+        print("token_json", token_json)
+
+        # 4. PASO: access_token gorde
+        self._access_token = token_json["access_token"]
+        print("access_token: " + self._access_token)
 
         self._root.destroy()
 
