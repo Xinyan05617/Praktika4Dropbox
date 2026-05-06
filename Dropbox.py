@@ -76,17 +76,20 @@ class Dropbox:
 
         # 3. PASO: auth_code trukatu access_token-engatik
         token_url = "https://api.dropboxapi.com/oauth2/token"
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded"
+        goiburuak = {
+            'Host': 'api.dropboxapi.com',
+            'Content-Type': 'application/x-www-form-urlencoded'
         }
-        data = {
-            "code": auth_code,
-            "grant_type": "authorization_code",
-            "client_id": app_key,
-            "client_secret": app_secret,
-            "redirect_uri": redirect_uri
+        datuak = {
+            'code': auth_code,
+            'grant_type': 'authorization_code',
+            'client_id': app_key,
+            'client_secret': app_secret,
+            'redirect_uri': redirect_uri
         }
-        erantzuna = requests.post(token_url, headers=headers, data=data, allow_redirects=False)
+        datuak_form = urllib.parse.urlencode(datuak)  # edukia inprimaki formatudun katean kodifikatu
+        goiburuak['Content-Length'] = str(len(datuak_form))  # goiburuak eguneratzen ditugu
+        erantzuna = requests.post(token_url, headers=goiburuak, data=datuak_form, allow_redirects=False)
         status = erantzuna.status_code
         token_json = erantzuna.json()
         print("Statusa", status)
@@ -106,7 +109,32 @@ class Dropbox:
         # RELLENAR CON CODIGO DE LA PETICION HTTP
         # Y PROCESAMIENTO DE LA RESPUESTA HTTP
         #############################################
+        goiburuak = {
+            'Host': 'api.dropboxapi.com',
+            'Authorization': 'Bearer ' + self._access_token,
+            'Content-Type': 'application/json'
+        }
+        path = "" if self._path == "/" else self._path
+        datuak = {'path': path,
+                  'recursive': False}
+        datuak_json = json.dumps(datuak)
+        goiburuak['Content-Length'] = str(len(datuak_json))
 
+        erantzuna = requests.post(uri, headers=goiburuak, data=datuak_json, allow_redirects=False)
+        status = erantzuna.status_code
+        print("\tStatus: " + str(status))
+        edukia_json = json.loads(erantzuna.text)
+
+        guztiak = edukia_json['entries']
+
+        while edukia_json['has_more']:
+            uri_continue = 'https://api.dropboxapi.com/2/files/list_folder/continue'
+            datuak_continue = json.dumps({'cursor': edukia_json['cursor']})
+            erantzuna = requests.post(uri_continue, headers=goiburuak, data=datuak_continue, allow_redirects=False)
+            edukia_json = json.loads(erantzuna.text)
+            guztiak += edukia_json['entries']
+
+        contenido_json = {'entries': guztiak}
         self._files = helper.update_listbox2(msg_listbox, self._path, contenido_json)
 
     def transfer_file(self, file_path, file_data):
@@ -117,6 +145,28 @@ class Dropbox:
         # RELLENAR CON CODIGO DE LA PETICION HTTP
         # Y PROCESAMIENTO DE LA RESPUESTA HTTP
         #############################################
+        datuak = {
+            'path': file_path,
+            'mode': 'add',
+            'autorename': True,
+            'mute': False,
+            'strict_conflict': False
+        }
+        datuak_json = json.dumps(datuak)
+
+        goiburuak = {
+            'Host' : 'content.dropboxapi.com',
+            'Authorization': 'Bearer ' + self._access_token,
+            'Content-Type': 'application/octet-stream',
+            'Dropbox-API-Arg': datuak_json,
+            'Content-Length': str(len(datuak_json))
+        }
+
+        erantzuna = requests.post(uri, headers=goiburuak, data=file_data, allow_redirects=False)
+        status = erantzuna.status_code
+        deskribapena = erantzuna.content
+        print("\tStatus: " + str(status))
+        print("\tDeskribapena: " + deskribapena)
 
     def delete_file(self, file_path):
         print("/delete_file")
@@ -126,11 +176,41 @@ class Dropbox:
         # RELLENAR CON CODIGO DE LA PETICION HTTP
         # Y PROCESAMIENTO DE LA RESPUESTA HTTP
         #############################################
+        goiburuak = {
+            'Host': 'api.dropboxapi.com',
+            'Authorization': 'Bearer ' + self._access_token,
+            'Content-Type': 'application/json'
+        }
+        datuak = {'path': file_path}
+        datuak_json = json.dumps(datuak)
+        goiburuak['Content-Length'] = str(len(datuak_json))
+
+        erantzuna = requests.post(uri, headers=goiburuak, data=datuak_json, allow_redirects=False)
+        status = erantzuna.status_code
+        deskribapena = erantzuna.content
+        print('Status: ' + str(status))
+        print("\tDeskribapena: " + deskribapena)
 
     def create_folder(self, path):
         print("/create_folder")
-       # https://www.dropbox.com/developers/documentation/http/documentation#files-create_folder
+        uri = 'https://api.dropboxapi.com/2/files/create_folder_v2'
+        # https://www.dropbox.com/developers/documentation/http/documentation#files-create_folder
         #############################################
         # RELLENAR CON CODIGO DE LA PETICION HTTP
         # Y PROCESAMIENTO DE LA RESPUESTA HTTP
         #############################################
+        goiburuak = {
+            'Host': 'api.dropboxapi.com',
+            'Authorization': 'Bearer ' + self._access_token,
+            'Content-Type': 'application/json'
+        }
+        datuak = {'path': path,
+                  'autorename': False}
+        datuak_json = json.dumps(datuak)
+        goiburuak['Content-Length'] = str(len(datuak_json))
+
+        erantzuna = requests.post(uri, headers=goiburuak, data=datuak_json, allow_redirects=False)
+        status = erantzuna.status_code
+        deskribapena = erantzuna.content
+        print('Status: ' + str(status))
+        print("\tDeskribapena: " + deskribapena)
