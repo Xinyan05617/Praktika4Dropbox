@@ -5,8 +5,8 @@ from socket import AF_INET, socket, SOCK_STREAM
 import json
 import helper
 
-app_key = ''
-app_secret = ''
+app_key = '76svyfxh10f8e3b'
+app_secret = 'lh90c8s335l7yu5'
 server_addr = "localhost"
 server_port = 8090
 redirect_uri = "http://" + server_addr + ":" + str(server_port)
@@ -46,7 +46,9 @@ class Dropbox:
                         "<head><title>Proba</title></head>" \
                         "<body>The authentication flow has completed. Close this window.</body>" \
                         "</html>"
-        client_connection.sendall(http_response)
+
+        #client_connection.sendall(http_response)
+        client_connection.sendall(http_response.encode())
         client_connection.close()
         server_socket.close()
 
@@ -145,28 +147,28 @@ class Dropbox:
         # RELLENAR CON CODIGO DE LA PETICION HTTP
         # Y PROCESAMIENTO DE LA RESPUESTA HTTP
         #############################################
-        datuak = {
+        dropboxAPIArg = {
             'path': file_path,
             'mode': 'add',
             'autorename': True,
             'mute': False,
             'strict_conflict': False
         }
-        datuak_json = json.dumps(datuak)
+        dropboxAPIArg_json = json.dumps(dropboxAPIArg)
 
         goiburuak = {
             'Host' : 'content.dropboxapi.com',
             'Authorization': 'Bearer ' + self._access_token,
             'Content-Type': 'application/octet-stream',
-            'Dropbox-API-Arg': datuak_json,
-            'Content-Length': str(len(datuak_json))
+            'Dropbox-API-Arg': dropboxAPIArg_json,
+            'Content-Length': str(len(file_data))
         }
 
         erantzuna = requests.post(uri, headers=goiburuak, data=file_data, allow_redirects=False)
         status = erantzuna.status_code
         deskribapena = erantzuna.content
         print("\tStatus: " + str(status))
-        print("\tDeskribapena: " + deskribapena)
+        print("\tDeskribapena: " + str(deskribapena))
 
     def delete_file(self, file_path):
         print("/delete_file")
@@ -189,7 +191,7 @@ class Dropbox:
         status = erantzuna.status_code
         deskribapena = erantzuna.content
         print('Status: ' + str(status))
-        print("\tDeskribapena: " + deskribapena)
+        print("\tDeskribapena: " + str(deskribapena))
 
     def create_folder(self, path):
         print("/create_folder")
@@ -213,4 +215,4 @@ class Dropbox:
         status = erantzuna.status_code
         deskribapena = erantzuna.content
         print('Status: ' + str(status))
-        print("\tDeskribapena: " + deskribapena)
+        print("\tDeskribapena: " + str(deskribapena))

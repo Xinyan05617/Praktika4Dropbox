@@ -6,7 +6,6 @@ from urllib.parse import unquote
 from bs4 import BeautifulSoup
 import time
 import helper
-import os
 
 class eGela:
     _login = 0
@@ -19,6 +18,11 @@ class eGela:
         self._root = root
 
     def check_credentials(self, username, password, event=None):
+        if hasattr(username, 'get'):
+            username = username.get()
+        if hasattr(password, 'get'):
+            password = password.get()
+
         popup, progress_var, progress_bar = helper.progress("check_credentials", "Logging into eGela...")
         progress = 0
         progress_var.set(progress)
@@ -248,13 +252,6 @@ class eGela:
         }
         erantzuna = requests.get(pdf_link, headers=goiburuak, allow_redirects=False)
         pdf_content = erantzuna.content
-
-        os.makedirs("pdfs", exist_ok=True)
-
-        ruta = os.path.join("pdfs", pdf_name)
-
-        with open(ruta, "wb") as f:
-            f.write(pdf_content)
 
         print(f"\t PDF deskargatuta: {pdf_name} ({len(pdf_content)} bytes)")
 
