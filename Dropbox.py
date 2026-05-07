@@ -3,10 +3,11 @@ import urllib
 import webbrowser
 from socket import AF_INET, socket, SOCK_STREAM
 import json
+import tkinter as tk
 import helper
 
-app_key = '76svyfxh10f8e3b'
-app_secret = 'lh90c8s335l7yu5'
+app_key = '57zf7o2ooz897ti'
+app_secret = 'd4edrqdiof5bz0h'
 server_addr = "localhost"
 server_port = 8090
 redirect_uri = "http://" + server_addr + ":" + str(server_port)
@@ -22,32 +23,27 @@ class Dropbox:
         self._root = root
 
     def local_server(self):
-        # por el puerto 8090 esta escuchando el servidor que generamos
         server_socket = socket(AF_INET, SOCK_STREAM)
         server_socket.bind((server_addr, server_port))
         server_socket.listen(1)
         print("\tLocal server listening on port " + str(server_port))
 
-        # recibe la redireccio 302 del navegador
         client_connection, client_address = server_socket.accept()
         peticion = client_connection.recv(1024)
         print("\tRequest from the browser received at local server:")
-        print (peticion)
+        print(peticion)
 
-        # buscar en solicitud el "auth_code"
-        primera_linea =peticion.decode('UTF8').split('\n')[0]
+        primera_linea = peticion.decode('UTF8').split('\n')[0]
         aux_auth_code = primera_linea.split(' ')[1]
         auth_code = aux_auth_code[7:].split('&')[0]
-        print ("\tauth_code: " + auth_code)
+        print("\tauth_code: " + auth_code)
 
-        # devolver una respuesta al usuario
         http_response = "HTTP/1.1 200 OK\r\n\r\n" \
                         "<html>" \
                         "<head><title>Proba</title></head>" \
                         "<body>The authentication flow has completed. Close this window.</body>" \
                         "</html>"
 
-        #client_connection.sendall(http_response)
         client_connection.sendall(http_response.encode())
         client_connection.close()
         server_socket.close()
@@ -55,13 +51,6 @@ class Dropbox:
         return auth_code
 
     def do_oauth(self):
-        #############################################
-        # RELLENAR CON CODIGO DE LAS PETICIONES HTTP
-        # Y PROCESAMIENTO DE LAS RESPUESTAS HTTP
-        # PARA LA OBTENCION DEL ACCESS TOKEN
-        #############################################
-
-        # 1. PASO: Autorización URL construitu eta nabigatzailea ireki
         auth_url = "https://www.dropbox.com/oauth2/authorize"
         params = {
             "client_id": app_key,
@@ -72,11 +61,9 @@ class Dropbox:
         print("Opening browser for Dropbox authorization...")
         webbrowser.open(full_url)
 
-        # 2. PASO: auth_code lortu tokiko zerbitzaritik
         auth_code = self.local_server()
         print("auth_code received: " + auth_code)
 
-        # 3. PASO: auth_code trukatu access_token-engatik
         token_url = "https://api.dropboxapi.com/oauth2/token"
         goiburuak = {
             'Host': 'api.dropboxapi.com',
@@ -89,64 +76,53 @@ class Dropbox:
             'client_secret': app_secret,
             'redirect_uri': redirect_uri
         }
-        datuak_form = urllib.parse.urlencode(datuak)  # edukia inprimaki formatudun katean kodifikatu
-        goiburuak['Content-Length'] = str(len(datuak_form))  # goiburuak eguneratzen ditugu
+        datuak_form = urllib.parse.urlencode(datuak)
+        goiburuak['Content-Length'] = str(len(datuak_form))
         erantzuna = requests.post(token_url, headers=goiburuak, data=datuak_form, allow_redirects=False)
-        status = erantzuna.status_code
         token_json = erantzuna.json()
-        print("Statusa", status)
+        print("Statusa", erantzuna.status_code)
         print("token_json", token_json)
 
-        # 4. PASO: access_token gorde
         self._access_token = token_json["access_token"]
         print("access_token: " + self._access_token)
-
         self._root.destroy()
 
-    def list_folder(self, msg_listbox):
-        print("/list_folder")
+    # ------------------------------------------------------------------
+    # Metodo interno: obtener entradas de una carpeta de Dropbox
+    # ------------------------------------------------------------------
+    def _get_folder_entries(self, path):
         uri = 'https://api.dropboxapi.com/2/files/list_folder'
-        # https://www.dropbox.com/developers/documentation/http/documentation#files-list_folder
-        #############################################
-        # RELLENAR CON CODIGO DE LA PETICION HTTP
-        # Y PROCESAMIENTO DE LA RESPUESTA HTTP
-        #############################################
         goiburuak = {
             'Host': 'api.dropboxapi.com',
             'Authorization': 'Bearer ' + self._access_token,
             'Content-Type': 'application/json'
         }
-        path = "" if self._path == "/" else self._path
-        datuak = {'path': path,
-                  'recursive': False}
+        datuak = {'path': path if path != '/' else '', 'recursive': False}
         datuak_json = json.dumps(datuak)
         goiburuak['Content-Length'] = str(len(datuak_json))
 
         erantzuna = requests.post(uri, headers=goiburuak, data=datuak_json, allow_redirects=False)
-        status = erantzuna.status_code
-        print("\tStatus: " + str(status))
         edukia_json = json.loads(erantzuna.text)
+        guztiak = edukia_json.get('entries', [])
 
-        guztiak = edukia_json['entries']
-
-        while edukia_json['has_more']:
+        while edukia_json.get('has_more', False):
             uri_continue = 'https://api.dropboxapi.com/2/files/list_folder/continue'
             datuak_continue = json.dumps({'cursor': edukia_json['cursor']})
             erantzuna = requests.post(uri_continue, headers=goiburuak, data=datuak_continue, allow_redirects=False)
             edukia_json = json.loads(erantzuna.text)
-            guztiak += edukia_json['entries']
+            guztiak += edukia_json.get('entries', [])
 
-        contenido_json = {'entries': guztiak}
+        return guztiak
+
+    def list_folder(self, msg_listbox):
+        print("/list_folder")
+        entries = self._get_folder_entries(self._path)
+        contenido_json = {'entries': entries}
         self._files = helper.update_listbox2(msg_listbox, self._path, contenido_json)
 
     def transfer_file(self, file_path, file_data):
         print("/upload")
         uri = 'https://content.dropboxapi.com/2/files/upload'
-        # https://www.dropbox.com/developers/documentation/http/documentation#files-upload
-        #############################################
-        # RELLENAR CON CODIGO DE LA PETICION HTTP
-        # Y PROCESAMIENTO DE LA RESPUESTA HTTP
-        #############################################
         dropboxAPIArg = {
             'path': file_path,
             'mode': 'add',
@@ -155,29 +131,20 @@ class Dropbox:
             'strict_conflict': False
         }
         dropboxAPIArg_json = json.dumps(dropboxAPIArg)
-
         goiburuak = {
-            'Host' : 'content.dropboxapi.com',
+            'Host': 'content.dropboxapi.com',
             'Authorization': 'Bearer ' + self._access_token,
             'Content-Type': 'application/octet-stream',
             'Dropbox-API-Arg': dropboxAPIArg_json,
             'Content-Length': str(len(file_data))
         }
-
         erantzuna = requests.post(uri, headers=goiburuak, data=file_data, allow_redirects=False)
-        status = erantzuna.status_code
-        deskribapena = erantzuna.content
-        print("\tStatus: " + str(status))
-        print("\tDeskribapena: " + str(deskribapena))
+        print("\tStatus: " + str(erantzuna.status_code))
+        print("\tDeskribapena: " + str(erantzuna.content))
 
     def delete_file(self, file_path):
         print("/delete_file")
         uri = 'https://api.dropboxapi.com/2/files/delete_v2'
-        # https://www.dropbox.com/developers/documentation/http/documentation#files-delete
-        #############################################
-        # RELLENAR CON CODIGO DE LA PETICION HTTP
-        # Y PROCESAMIENTO DE LA RESPUESTA HTTP
-        #############################################
         goiburuak = {
             'Host': 'api.dropboxapi.com',
             'Authorization': 'Bearer ' + self._access_token,
@@ -186,33 +153,174 @@ class Dropbox:
         datuak = {'path': file_path}
         datuak_json = json.dumps(datuak)
         goiburuak['Content-Length'] = str(len(datuak_json))
-
         erantzuna = requests.post(uri, headers=goiburuak, data=datuak_json, allow_redirects=False)
-        status = erantzuna.status_code
-        deskribapena = erantzuna.content
-        print('Status: ' + str(status))
-        print("\tDeskribapena: " + str(deskribapena))
+        print('Status: ' + str(erantzuna.status_code))
+        print("\tDeskribapena: " + str(erantzuna.content))
 
     def create_folder(self, path):
         print("/create_folder")
         uri = 'https://api.dropboxapi.com/2/files/create_folder_v2'
-        # https://www.dropbox.com/developers/documentation/http/documentation#files-create_folder
-        #############################################
-        # RELLENAR CON CODIGO DE LA PETICION HTTP
-        # Y PROCESAMIENTO DE LA RESPUESTA HTTP
-        #############################################
         goiburuak = {
             'Host': 'api.dropboxapi.com',
             'Authorization': 'Bearer ' + self._access_token,
             'Content-Type': 'application/json'
         }
-        datuak = {'path': path,
-                  'autorename': False}
+        datuak = {'path': path, 'autorename': False}
         datuak_json = json.dumps(datuak)
         goiburuak['Content-Length'] = str(len(datuak_json))
-
         erantzuna = requests.post(uri, headers=goiburuak, data=datuak_json, allow_redirects=False)
-        status = erantzuna.status_code
-        deskribapena = erantzuna.content
-        print('Status: ' + str(status))
-        print("\tDeskribapena: " + str(deskribapena))
+        print('Status: ' + str(erantzuna.status_code))
+        print("\tDeskribapena: " + str(erantzuna.content))
+
+    # ------------------------------------------------------------------
+    # Dialogo para elegir carpeta destino (usado por move y copy)
+    # ------------------------------------------------------------------
+    def _pick_folder(self, parent_window, title="Select destination folder"):
+        """
+        Abre un popup navegable con las carpetas de Dropbox.
+        Devuelve la ruta de la carpeta elegida (str) o None si se cancela.
+        Doble clic en una carpeta entra en ella; doble clic en '..' sube un nivel.
+        El boton 'Select this folder' confirma la carpeta actual como destino.
+        """
+        result = {'path': None}
+        current = ['/']
+
+        popup = tk.Toplevel(parent_window)
+        popup.title(title)
+        popup.geometry('360x320')
+        popup.iconbitmap('./favicon.ico')
+        helper.center(popup)
+        popup.grab_set()  # modal: bloquea la ventana principal
+
+        var_path = tk.StringVar(value='/')
+        lbl = tk.Label(popup, textvariable=var_path, anchor='w', relief='sunken', padx=4)
+        lbl.pack(fill=tk.X, padx=8, pady=(8, 0))
+
+        frame_lb = tk.Frame(popup)
+        frame_lb.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
+        sb = tk.Scrollbar(frame_lb)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+        lb = tk.Listbox(frame_lb, yscrollcommand=sb.set, selectmode=tk.SINGLE)
+        lb.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        sb.config(command=lb.yview)
+
+        def load_path(path):
+            lb.delete(0, tk.END)
+            current[0] = path
+            var_path.set(path)
+            if path != '/':
+                lb.insert(tk.END, '..')
+                lb.itemconfigure(tk.END, background='#C6185C', foreground='white')
+            entries = self._get_folder_entries(path)
+            for e in entries:
+                if e['.tag'] == 'folder':
+                    lb.insert(tk.END, e['name'])
+                    lb.itemconfigure(tk.END, background='#7C86FF', foreground='white')
+
+        def on_double_click(event):
+            import os
+            sel = lb.curselection()
+            if not sel:
+                return
+            name = lb.get(sel[0])
+            if name == '..':
+                parent, _ = os.path.split(current[0])
+                load_path(parent if parent else '/')
+            else:
+                new_path = current[0].rstrip('/') + '/' + name
+                load_path(new_path)
+
+        lb.bind('<Double-Button-1>', on_double_click)
+
+        frame_btn = tk.Frame(popup)
+        frame_btn.pack(fill=tk.X, padx=8, pady=(0, 8))
+
+        tk.Button(frame_btn, text="Select this folder", background='#228B22', fg='white',
+                  command=lambda: [result.update({'path': current[0]}), popup.destroy()]
+                  ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 4))
+        tk.Button(frame_btn, text="Cancel", background='#C6185C', fg='white',
+                  command=popup.destroy
+                  ).pack(side=tk.LEFT, expand=True, fill=tk.X)
+
+        load_path('/')
+        popup.wait_window()
+        return result['path']
+
+    def move_file(self, from_path, parent_window):
+        """
+        Abre el dialogo de seleccion de carpeta y mueve from_path al destino elegido,
+        manteniendo el nombre original del fichero.
+        """
+        to_folder = self._pick_folder(parent_window, title="Move to...")
+        if to_folder is None:
+            return
+        print("/move_file")
+        uri = 'https://api.dropboxapi.com/2/files/move_v2'
+        # https://www.dropbox.com/developers/documentation/http/documentation#files-move_v2
+        goiburuak = {
+            'Host': 'api.dropboxapi.com',
+            'Authorization': 'Bearer ' + self._access_token,
+            'Content-Type': 'application/json'
+        }
+        file_name = from_path.split('/')[-1]
+        to_path = to_folder.rstrip('/') + '/' + file_name
+        datuak = {'from_path': from_path, 'to_path': to_path, 'autorename': True}
+        datuak_json = json.dumps(datuak)
+        goiburuak['Content-Length'] = str(len(datuak_json))
+        erantzuna = requests.post(uri, headers=goiburuak, data=datuak_json, allow_redirects=False)
+        print('\tStatus: ' + str(erantzuna.status_code))
+        print('\tDeskribapena: ' + str(erantzuna.content))
+
+    def copy_file(self, from_path, parent_window):
+        """
+        Abre el dialogo de seleccion de carpeta y copia from_path al destino elegido,
+        manteniendo el nombre original del fichero.
+        """
+        to_folder = self._pick_folder(parent_window, title="Copy to...")
+        if to_folder is None:
+            return
+        print("/copy_file")
+        uri = 'https://api.dropboxapi.com/2/files/copy_v2'
+        # https://www.dropbox.com/developers/documentation/http/documentation#files-copy_v2
+        goiburuak = {
+            'Host': 'api.dropboxapi.com',
+            'Authorization': 'Bearer ' + self._access_token,
+            'Content-Type': 'application/json'
+        }
+        file_name = from_path.split('/')[-1]
+        to_path = to_folder.rstrip('/') + '/' + file_name
+        datuak = {'from_path': from_path, 'to_path': to_path, 'autorename': True}
+        datuak_json = json.dumps(datuak)
+        goiburuak['Content-Length'] = str(len(datuak_json))
+        erantzuna = requests.post(uri, headers=goiburuak, data=datuak_json, allow_redirects=False)
+        print('\tStatus: ' + str(erantzuna.status_code))
+        print('\tDeskribapena: ' + str(erantzuna.content))
+
+    def search_files(self, query, msg_listbox):
+        """
+        Filtro LOCAL sobre self._files ya cargados.
+        Muestra solo los ficheros cuyo nombre contenga 'query' (case-insensitive).
+        Si query esta vacio, restaura la lista completa.
+        """
+        print("/search_files (local filter): " + query)
+        msg_listbox.delete(0, tk.END)
+
+        if not query.strip():
+            # Sin filtro: recargar lista completa
+            contenido_json = {'entries': self._files}
+            self._files = helper.update_listbox2(msg_listbox, self._path, contenido_json)
+            return
+
+        q = query.lower()
+        filtered = [f for f in self._files if q in f['name'].lower()]
+
+        if self._path != '/':
+            msg_listbox.insert(tk.END, "..")
+            msg_listbox.itemconfigure(tk.END, background="#C6185C", foreground='white')
+
+        for f in filtered:
+            msg_listbox.insert(tk.END, f['name'])
+            if f['.tag'] == 'folder':
+                msg_listbox.itemconfigure(tk.END, background="#7C86FF", foreground='white')
+
+        print('\tResultados encontrados: ' + str(len(filtered)))
