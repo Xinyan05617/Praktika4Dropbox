@@ -51,6 +51,7 @@ class Dropbox:
         return auth_code
 
     def do_oauth(self):
+        metodoa1 = 'GET'
         base_uria = "https://www.dropbox.com/oauth2/authorize"
         parametroak = {
             "client_id": app_key,
@@ -65,6 +66,7 @@ class Dropbox:
         auth_code = self.local_server()
         print("auth_code: " + auth_code)
 
+        metodoa2 = 'POST'
         token_url = "https://api.dropboxapi.com/oauth2/token"
         goiburuak = {
             'Host': 'api.dropboxapi.com',
@@ -73,9 +75,9 @@ class Dropbox:
         edukia = {
             'code': auth_code,
             'grant_type': 'authorization_code',
+            'redirect_uri': redirect_uri,
             'client_id': app_key,
-            'client_secret': app_secret,
-            'redirect_uri': redirect_uri
+            'client_secret': app_secret
         }
         edukia_form = urllib.parse.urlencode(edukia)
         goiburuak['Content-Length'] = str(len(edukia_form))
@@ -98,7 +100,8 @@ class Dropbox:
             'Authorization': 'Bearer ' + self._access_token,
             'Content-Type': 'application/json'
         }
-        edukia = {'path': path if path != '/' else '', 'recursive': False}
+        edukia = {'path': path if path != '/' else '',
+                  'recursive': False}
         edukia_json = json.dumps(edukia)
         goiburuak['Content-Length'] = str(len(edukia_json))
 
@@ -125,10 +128,10 @@ class Dropbox:
         print("/upload")
         uri = 'https://content.dropboxapi.com/2/files/upload'
         dropboxAPIArg = {
-            'path': file_path,
-            'mode': 'add',
             'autorename': True,
+            'mode': 'add',
             'mute': False,
+            'path': file_path,
             'strict_conflict': False
         }
         dropboxAPIArg_json = json.dumps(dropboxAPIArg)
@@ -166,7 +169,8 @@ class Dropbox:
             'Authorization': 'Bearer ' + self._access_token,
             'Content-Type': 'application/json'
         }
-        edukia = {'path': path, 'autorename': False}
+        edukia = {'path': path,
+                  'autorename': True}
         edukia_json = json.dumps(edukia)
         goiburuak['Content-Length'] = str(len(edukia_json))
         erantzuna = requests.post(uri, headers=goiburuak, data=edukia_json, allow_redirects=False)
