@@ -51,36 +51,37 @@ class Dropbox:
         return auth_code
 
     def do_oauth(self):
-        auth_url = "https://www.dropbox.com/oauth2/authorize"
-        params = {
+        base_uria = "https://www.dropbox.com/oauth2/authorize"
+        parametroak = {
             "client_id": app_key,
             "response_type": "code",
             "redirect_uri": redirect_uri
         }
-        full_url = auth_url + "?" + urllib.parse.urlencode(params)
-        print("Opening browser for Dropbox authorization...")
-        webbrowser.open(full_url)
+        parametroak_form = urllib.parse.urlencode(parametroak)
+        uria = base_uria + "?" + parametroak_form
+        print("Dropbox-en baimena emateko nabigatzailea irekitzen......")
+        webbrowser.open(uria)
 
         auth_code = self.local_server()
-        print("auth_code received: " + auth_code)
+        print("auth_code: " + auth_code)
 
         token_url = "https://api.dropboxapi.com/oauth2/token"
         goiburuak = {
             'Host': 'api.dropboxapi.com',
             'Content-Type': 'application/x-www-form-urlencoded'
         }
-        datuak = {
+        edukia = {
             'code': auth_code,
             'grant_type': 'authorization_code',
             'client_id': app_key,
             'client_secret': app_secret,
             'redirect_uri': redirect_uri
         }
-        datuak_form = urllib.parse.urlencode(datuak)
-        goiburuak['Content-Length'] = str(len(datuak_form))
-        erantzuna = requests.post(token_url, headers=goiburuak, data=datuak_form, allow_redirects=False)
+        edukia_form = urllib.parse.urlencode(edukia)
+        goiburuak['Content-Length'] = str(len(edukia_form))
+        erantzuna = requests.post(token_url, headers=goiburuak, data=edukia_form, allow_redirects=False)
         token_json = erantzuna.json()
-        print("Statusa", erantzuna.status_code)
+        print("Estatusa", erantzuna.status_code)
         print("token_json", token_json)
 
         self._access_token = token_json["access_token"]
@@ -97,11 +98,11 @@ class Dropbox:
             'Authorization': 'Bearer ' + self._access_token,
             'Content-Type': 'application/json'
         }
-        datuak = {'path': path if path != '/' else '', 'recursive': False}
-        datuak_json = json.dumps(datuak)
-        goiburuak['Content-Length'] = str(len(datuak_json))
+        edukia = {'path': path if path != '/' else '', 'recursive': False}
+        edukia_json = json.dumps(edukia)
+        goiburuak['Content-Length'] = str(len(edukia_json))
 
-        erantzuna = requests.post(uri, headers=goiburuak, data=datuak_json, allow_redirects=False)
+        erantzuna = requests.post(uri, headers=goiburuak, data=edukia_json, allow_redirects=False)
         edukia_json = json.loads(erantzuna.text)
         guztiak = edukia_json.get('entries', [])
 
@@ -139,7 +140,7 @@ class Dropbox:
             'Content-Length': str(len(file_data))
         }
         erantzuna = requests.post(uri, headers=goiburuak, data=file_data, allow_redirects=False)
-        print("\tStatus: " + str(erantzuna.status_code))
+        print("\tEstatusa: " + str(erantzuna.status_code))
         print("\tDeskribapena: " + str(erantzuna.content))
 
     def delete_file(self, file_path):
@@ -150,11 +151,11 @@ class Dropbox:
             'Authorization': 'Bearer ' + self._access_token,
             'Content-Type': 'application/json'
         }
-        datuak = {'path': file_path}
-        datuak_json = json.dumps(datuak)
-        goiburuak['Content-Length'] = str(len(datuak_json))
-        erantzuna = requests.post(uri, headers=goiburuak, data=datuak_json, allow_redirects=False)
-        print('Status: ' + str(erantzuna.status_code))
+        edukia = {'path': file_path}
+        edukia_json = json.dumps(edukia)
+        goiburuak['Content-Length'] = str(len(edukia_json))
+        erantzuna = requests.post(uri, headers=goiburuak, data=edukia_json, allow_redirects=False)
+        print('Estatusa: ' + str(erantzuna.status_code))
         print("\tDeskribapena: " + str(erantzuna.content))
 
     def create_folder(self, path):
@@ -165,11 +166,11 @@ class Dropbox:
             'Authorization': 'Bearer ' + self._access_token,
             'Content-Type': 'application/json'
         }
-        datuak = {'path': path, 'autorename': False}
-        datuak_json = json.dumps(datuak)
-        goiburuak['Content-Length'] = str(len(datuak_json))
-        erantzuna = requests.post(uri, headers=goiburuak, data=datuak_json, allow_redirects=False)
-        print('Status: ' + str(erantzuna.status_code))
+        edukia = {'path': path, 'autorename': False}
+        edukia_json = json.dumps(edukia)
+        goiburuak['Content-Length'] = str(len(edukia_json))
+        erantzuna = requests.post(uri, headers=goiburuak, data=edukia_json, allow_redirects=False)
+        print('Estatusa: ' + str(erantzuna.status_code))
         print("\tDeskribapena: " + str(erantzuna.content))
 
     # ------------------------------------------------------------------
@@ -268,7 +269,7 @@ class Dropbox:
         datuak_json = json.dumps(datuak)
         goiburuak['Content-Length'] = str(len(datuak_json))
         erantzuna = requests.post(uri, headers=goiburuak, data=datuak_json, allow_redirects=False)
-        print('\tStatus: ' + str(erantzuna.status_code))
+        print('\tEstatusa: ' + str(erantzuna.status_code))
         print('\tDeskribapena: ' + str(erantzuna.content))
 
     def copy_file(self, from_path, parent_window):
@@ -293,7 +294,7 @@ class Dropbox:
         datuak_json = json.dumps(datuak)
         goiburuak['Content-Length'] = str(len(datuak_json))
         erantzuna = requests.post(uri, headers=goiburuak, data=datuak_json, allow_redirects=False)
-        print('\tStatus: ' + str(erantzuna.status_code))
+        print('\tEstatusa: ' + str(erantzuna.status_code))
         print('\tDeskribapena: ' + str(erantzuna.content))
 
     def search_files(self, query, msg_listbox):
