@@ -54,9 +54,9 @@ class Dropbox:
         metodoa1 = 'GET'
         base_uria = "https://www.dropbox.com/oauth2/authorize"
         parametroak = {
-            "client_id": app_key,
-            "response_type": "code",
-            "redirect_uri": redirect_uri
+            "client_id": app_key,       # Gure aplikazioaren identifikatzailea (Dropbox Developer Console-tik)
+            "response_type": "code",    # OAuth2 authorization code flow-a erabiltzen dugu
+            "redirect_uri": redirect_uri  # Baimena eman ondoren nabigatzaileak jo behar duen tokiko helbidea
         }
         parametroak_form = urllib.parse.urlencode(parametroak)
         uria = base_uria + "?" + parametroak_form
@@ -70,14 +70,14 @@ class Dropbox:
         token_url = "https://api.dropboxapi.com/oauth2/token"
         goiburuak = {
             'Host': 'api.dropboxapi.com',
-            'Content-Type': 'application/x-www-form-urlencoded'
+            'Content-Type': 'application/x-www-form-urlencoded'  # Formulario bidez bidaltzen dugu
         }
         edukia = {
-            'code': auth_code,
-            'grant_type': 'authorization_code',
-            'redirect_uri': redirect_uri,
-            'client_id': app_key,
-            'client_secret': app_secret
+            'code': auth_code,              # Autorizazio-kodea, aurretik tokiko zerbitzariak jaso duena
+            'grant_type': 'authorization_code',  # OAuth2 flow mota: kodea access token-engatik trukatzea
+            'redirect_uri': redirect_uri,   # Jatorrizko eskaerako redirect_uri bera (Dropbox-ek egiaztatzeko)
+            'client_id': app_key,           # Aplikazioaren identifikatzailea
+            'client_secret': app_secret     # Aplikazioaren gako sekretua (inoiz publikatu gabe gorde behar da)
         }
         edukia_form = urllib.parse.urlencode(edukia)
         goiburuak['Content-Length'] = str(len(edukia_form))
@@ -86,7 +86,7 @@ class Dropbox:
         print("Estatusa", erantzuna.status_code)
         print("token_json", token_json)
 
-        self._access_token = token_json["access_token"]
+        self._access_token = token_json["access_token"]  # Hemendik aurrera eskaera guztietan erabiliko dugu
         print("access_token: " + self._access_token)
         self._root.destroy()
 
@@ -97,11 +97,13 @@ class Dropbox:
         uri = 'https://api.dropboxapi.com/2/files/list_folder'
         goiburuak = {
             'Host': 'api.dropboxapi.com',
-            'Authorization': 'Bearer ' + self._access_token,
+            'Authorization': 'Bearer ' + self._access_token,  # Bearer token bidez autentifikatzen gara
             'Content-Type': 'application/json'
         }
-        edukia = {'path': path if path != '/' else '',
-                  'recursive': False}
+        edukia = {
+            'path': path if path != '/' else '',  # Erroa denean kate hutsa bidali behar da (Dropbox API-aren betekizuna)
+            'recursive': False                     # Azpikarpeta guztiak ez, soilik karpeta honen zuzeneko edukia
+        }
         edukia_json = json.dumps(edukia)
         goiburuak['Content-Length'] = str(len(edukia_json))
 
@@ -109,9 +111,10 @@ class Dropbox:
         edukia_json = json.loads(erantzuna.text)
         guztiak = edukia_json.get('entries', [])
 
+        # has_more=True bada, jarraitu hurrengo orrialdearekin cursor erabiliz
         while edukia_json.get('has_more', False):
             uri_continue = 'https://api.dropboxapi.com/2/files/list_folder/continue'
-            datuak_continue = json.dumps({'cursor': edukia_json['cursor']})
+            datuak_continue = json.dumps({'cursor': edukia_json['cursor']})  # Aurreko erantzuneko cursor-a pasatzen dugu
             erantzuna = requests.post(uri_continue, headers=goiburuak, data=datuak_continue, allow_redirects=False)
             edukia_json = json.loads(erantzuna.text)
             guztiak += edukia_json.get('entries', [])
@@ -128,19 +131,19 @@ class Dropbox:
         print("/upload")
         uri = 'https://content.dropboxapi.com/2/files/upload'
         dropboxAPIArg = {
-            'autorename': True,
-            'mode': 'add',
-            'mute': False,
-            'path': file_path,
-            'strict_conflict': False
+            'autorename': True,         # Izen-gatazka badago, automatikoki aldatuko du izena
+            'mode': 'add',              # 'add' modua: fitxategia gehitu, ez gainidatzi
+            'mute': False,              # True bada, Dropbox-ek ez du jakinarazpenik bidaliko
+            'path': file_path,          # Dropbox-en gorde behar den helmuga-bidea
+            'strict_conflict': False    # False bada, izen-gatazkak lasai kudeatzen ditu
         }
         dropboxAPIArg_json = json.dumps(dropboxAPIArg)
         goiburuak = {
             'Host': 'content.dropboxapi.com',
-            'Authorization': 'Bearer ' + self._access_token,
-            'Content-Type': 'application/octet-stream',
-            'Dropbox-API-Arg': dropboxAPIArg_json,
-            'Content-Length': str(len(file_data))
+            'Authorization': 'Bearer ' + self._access_token,       # Autentifikazioa
+            'Content-Type': 'application/octet-stream',             # Eduki gordina (PDF bytes) bidaltzen dugu
+            'Dropbox-API-Arg': dropboxAPIArg_json,                  # Dropbox-eko parametroak goiburuan doaz (ez gorputzean)
+            'Content-Length': str(len(file_data))                   # Bidalitako byte kopurua
         }
         erantzuna = requests.post(uri, headers=goiburuak, data=file_data, allow_redirects=False)
         print("\tEstatusa: " + str(erantzuna.status_code))
@@ -154,7 +157,9 @@ class Dropbox:
             'Authorization': 'Bearer ' + self._access_token,
             'Content-Type': 'application/json'
         }
-        edukia = {'path': file_path}
+        edukia = {
+            'path': file_path  # Ezabatu nahi den fitxategiaren edo karpetaren bide osoa
+        }
         edukia_json = json.dumps(edukia)
         goiburuak['Content-Length'] = str(len(edukia_json))
         erantzuna = requests.post(uri, headers=goiburuak, data=edukia_json, allow_redirects=False)
@@ -169,8 +174,10 @@ class Dropbox:
             'Authorization': 'Bearer ' + self._access_token,
             'Content-Type': 'application/json'
         }
-        edukia = {'path': path,
-                  'autorename': True}
+        edukia = {
+            'path': path,        # Sortu nahi den karpetaren bide osoa
+            'autorename': True   # Izen-gatazka badago, automatikoki aldatuko du izena
+        }
         edukia_json = json.dumps(edukia)
         goiburuak['Content-Length'] = str(len(edukia_json))
         erantzuna = requests.post(uri, headers=goiburuak, data=edukia_json, allow_redirects=False)
@@ -268,11 +275,14 @@ class Dropbox:
             'Content-Type': 'application/json'
         }
         file_name = from_path.split('/')[-1]
-        to_path = to_folder.rstrip('/') + '/' + file_name
-        datuak = {'from_path': from_path, 'to_path': to_path, 'autorename': True}
-        datuak_json = json.dumps(datuak)
-        goiburuak['Content-Length'] = str(len(datuak_json))
-        erantzuna = requests.post(uri, headers=goiburuak, data=datuak_json, allow_redirects=False)
+        edukia = {
+            'from_path': from_path,                             # Mugitu nahi den fitxategiaren jatorrizko bide osoa
+            'to_path': to_folder.rstrip('/') + '/' + file_name, # Helmugako bide osoa (karpeta + fitxategi izena)
+            'autorename': True                                  # Helmuga-izen gatazka badago, automatikoki aldatu
+        }
+        edukia_json = json.dumps(edukia)
+        goiburuak['Content-Length'] = str(len(edukia_json))
+        erantzuna = requests.post(uri, headers=goiburuak, data=edukia_json, allow_redirects=False)
         print('\tEstatusa: ' + str(erantzuna.status_code))
         print('\tDeskribapena: ' + str(erantzuna.content))
 
@@ -293,39 +303,73 @@ class Dropbox:
             'Content-Type': 'application/json'
         }
         file_name = from_path.split('/')[-1]
-        to_path = to_folder.rstrip('/') + '/' + file_name
-        datuak = {'from_path': from_path, 'to_path': to_path, 'autorename': True}
-        datuak_json = json.dumps(datuak)
-        goiburuak['Content-Length'] = str(len(datuak_json))
-        erantzuna = requests.post(uri, headers=goiburuak, data=datuak_json, allow_redirects=False)
+        edukia = {
+            'from_path': from_path,                             # Kopiatu nahi den fitxategiaren jatorrizko bide osoa
+            'to_path': to_folder.rstrip('/') + '/' + file_name, # Helmugako bide osoa (karpeta + fitxategi izena)
+            'autorename': True                                  # Helmuga-izen gatazka badago, automatikoki aldatu
+        }
+        edukia_json = json.dumps(edukia)
+        goiburuak['Content-Length'] = str(len(edukia_json))
+        erantzuna = requests.post(uri, headers=goiburuak, data=edukia_json, allow_redirects=False)
         print('\tEstatusa: ' + str(erantzuna.status_code))
         print('\tDeskribapena: ' + str(erantzuna.content))
 
     def search_files(self, query, msg_listbox):
         """
-        Filtro LOCAL sobre self._files ya cargados.
-        Muestra solo los ficheros cuyo nombre contenga 'query' (case-insensitive).
-        Si query esta vacio, restaura la lista completa.
+        Dropbox API /files/search_v2 erabiliz bilaketa egiten du fitxategi izenetan.
+        Emaitzak msg_listbox-en erakusten ditu.
+        Query hutsa bada, karpeta-zerrenda normala berrezartzen du.
         """
-        print("/search_files (local filter): " + query)
-        msg_listbox.delete(0, tk.END)
+        print("/search_files: " + query)
 
         if not query.strip():
-            # Sin filtro: recargar lista completa
-            contenido_json = {'entries': self._files}
-            self._files = helper.update_listbox2(msg_listbox, self._path, contenido_json)
+            # Query hutsa: karpetaren zerrenda normala berrezarri
+            self.list_folder(msg_listbox)
             return
 
-        q = query.lower()
-        filtered = [f for f in self._files if q in f['name'].lower()]
+        uri = 'https://api.dropboxapi.com/2/files/search_v2'
+        # https://www.dropbox.com/developers/documentation/http/documentation#files-search_v2
+        goiburuak = {
+            'Host': 'api.dropboxapi.com',
+            'Authorization': 'Bearer ' + self._access_token,
+            'Content-Type': 'application/json'
+        }
+        edukia = {
+            'query': query,         # Bilatu nahi den testua fitxategi izenetan
+            'options': {
+                'path': '' if self._path == '/' else self._path,  # Bilaketa-eremua: karpeta hau eta azpikarpetetan
+                'filename_only': True,   # True: soilik fitxategi izenetan bilatu (ez edukian)
+                'max_results': 100       # Gehienez itzultzen diren emaitza kopurua
+            }
+        }
+        edukia_json = json.dumps(edukia)
+        goiburuak['Content-Length'] = str(len(edukia_json))
 
+        erantzuna = requests.post(uri, headers=goiburuak, data=edukia_json, allow_redirects=False)
+        print('\tEstatusa: ' + str(erantzuna.status_code))
+        erantzuna_json = json.loads(erantzuna.text)
+
+        # Emaitzak prozesatu: matches zerrendatik metadatuak atera
+        entries = []
+        for match in erantzuna_json.get('matches', []):
+            metadata = match.get('metadata', {}).get('metadata', {})
+            name = metadata.get('name', '')
+            # Soilik uneko karpetako emaitzak erakutsi (bilaketak azpikarpetetan ere bilatzen du)
+            if query.lower() in name.lower():
+                entries.append({
+                    'id': metadata.get('id', ''),
+                    'name': name,
+                    '.tag': metadata.get('.tag', 'file')
+                })
+
+        # Listbox eguneratu emaitza berriarekin
+        msg_listbox.delete(0, tk.END)
         if self._path != '/':
             msg_listbox.insert(tk.END, "..")
             msg_listbox.itemconfigure(tk.END, background="#C6185C", foreground='white')
-
-        for f in filtered:
-            msg_listbox.insert(tk.END, f['name'])
-            if f['.tag'] == 'folder':
+        for e in entries:
+            msg_listbox.insert(tk.END, e['name'])
+            if e['.tag'] == 'folder':
                 msg_listbox.itemconfigure(tk.END, background="#7C86FF", foreground='white')
 
-        print('\tResultados encontrados: ' + str(len(filtered)))
+        print('\tEmaitza kopurua: ' + str(len(entries)))
